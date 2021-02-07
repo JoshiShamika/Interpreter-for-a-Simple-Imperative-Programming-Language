@@ -1,0 +1,239 @@
+Standard ML of New Jersey v110.75 [built: Mon Jan 28 12:50:59 2013]
+[opening soyithi.sml]
+type Variable = string
+type Integer_constant = int
+type Boolean_constant = bool
+datatype Arithmetic_op = Div | Minus | Plus | Times
+datatype Relational_op = Eq | Ge | Gt | Le | Lt | Ne
+datatype Boolean_op = And | Or
+datatype IntegerExpression
+  = IArOp of IntegerExpression * Arithmetic_op * IntegerExpression
+  | IC of int
+  | IV of string
+datatype BooleanExpression
+  = BC of bool
+  | BEBop of BooleanExpression * Boolean_op * BooleanExpression
+  | BIns of IntegerExpression * Relational_op * IntegerExpression
+  | BV of string
+datatype Expression = EBoE of BooleanExpression | EIntE of IntegerExpression
+datatype Instruction
+  = InsAssignment of string * Expression
+  | InsCompound of Instruction list
+  | InsConditional of BooleanExpression * Instruction * Instruction
+  | InsLoop of BooleanExpression * Instruction
+  | Skip
+datatype Type = Boolean_Type | Integer_Type
+type Declaration = Variable * Type
+type DeclarationList = Declaration list
+type Program = DeclarationList * Instruction
+val num = "num" : string
+val i = "i" : string
+val fact = "fact" : string
+val r = "r" : string
+val sum = "sum" : string
+val temp = "temp" : string
+val result = "result" : string
+val Var_declaration =
+  [("num",Integer_Type),("i",Integer_Type),("fact",Integer_Type),
+   ("r",Integer_Type),("sum",Integer_Type),("temp",Integer_Type),
+   ("result",Boolean_Type)] : (string * Type) list
+val initialize =
+  InsCompound
+    [InsAssignment ("sum",EIntE #),InsAssignment ("num",EIntE #),
+     InsAssignment ("temp",EIntE #)] : Instruction
+val while_body2 =
+  InsCompound [InsAssignment ("fact",EIntE #),InsAssignment ("i",EIntE #)]
+  : Instruction
+val while_Loop2 =
+  InsLoop (BIns (IV #,Le,IV #),InsCompound [InsAssignment #,InsAssignment #])
+  : Instruction
+val while_body1 =
+  InsCompound
+    [InsAssignment ("i",EIntE #),InsAssignment ("fact",EIntE #),
+     InsAssignment ("r",EIntE #),InsLoop (BIns #,InsCompound #),
+     InsAssignment ("sum",EIntE #),InsAssignment ("num",EIntE #)]
+  : Instruction
+val while_Loop1 =
+  InsLoop
+    (BIns (IV #,Gt,IC #),
+     InsCompound
+       [InsAssignment #,InsAssignment #,InsAssignment #,InsLoop #,
+        InsAssignment #,InsAssignment #]) : Instruction
+val if_condition =
+  InsConditional
+    (BIns (IV #,Eq,IV #),InsAssignment ("result",EBoE #),
+     InsAssignment ("result",EBoE #)) : Instruction
+val body =
+  InsCompound
+    [InsCompound [InsAssignment #,InsAssignment #,InsAssignment #],
+     InsLoop (BIns #,InsCompound #),
+     InsConditional (BIns #,InsAssignment #,InsAssignment #)] : Instruction
+val Pgm =
+  ([("num",Integer_Type),("i",Integer_Type),("fact",Integer_Type),
+    ("r",Integer_Type),("sum",Integer_Type),("temp",Integer_Type),
+    ("result",Boolean_Type)],
+   InsCompound [InsCompound [#,#,#],InsLoop (#,#),InsConditional (#,#,#)])
+  : (string * Type) list * Instruction
+datatype IType = BoolRep | Intrep | NoDecRep
+type TypeMapImp = (Variable * IType) list
+val VarITypeSearch = fn : TypeMapImp -> Variable -> IType
+val TypeMapPlusOne = fn : TypeMapImp -> Declaration -> (Variable * IType) list
+val DecListToTMI = fn : Declaration list -> (Variable * IType) list
+val TMItable =
+  [("num",Intrep),("i",Intrep),("fact",Intrep),("r",Intrep),("sum",Intrep),
+   ("temp",Intrep),("result",BoolRep)] : (Variable * IType) list
+val test = Intrep : IType
+val Var_declaration =
+  [("fact",Integer_Type),("r",Integer_Type),("num",Integer_Type),
+   ("i",Integer_Type),("result",Boolean_Type),("sum",Integer_Type),
+   ("temp",Integer_Type)] : (string * Type) list
+val testDeclisttoTMI =
+  [("fact",Intrep),("r",Intrep),("num",Intrep),("i",Intrep),
+   ("result",BoolRep),("sum",Intrep),("temp",Intrep)]
+  : (Variable * IType) list
+val x = "x" : string
+val test = NoDecRep : IType
+val VarNotInDecList = fn : DeclarationList -> Variable -> bool
+val ValidDecList = fn : (Variable * Type) list -> bool
+val test7 = true : bool
+val Bad_declaration =
+  [("num",Integer_Type),("i",Integer_Type),("fact",Integer_Type),
+   ("i",Integer_Type)] : (string * Type) list
+val testBad7 = false : bool
+val VIntExp = fn : IntegerExpression -> TypeMapImp -> bool
+val z = IC 1 : IntegerExpression
+val z2 = IV "num" : IntegerExpression
+val z3 = IArOp (IV "sum",Plus,IV "fact") : IntegerExpression
+val testGoodIC = true : bool
+val testGoodIV = true : bool
+val testGoodIArOp = true : bool
+val y = "y" : string
+val z2 = IV "y" : IntegerExpression
+val testBadIV = false : bool
+val z2 = IArOp (IV "result",Plus,IV "fact") : IntegerExpression
+val testBadIArOp = false : bool
+val VBoolExp = fn : BooleanExpression -> TypeMapImp -> bool
+val z = BC true : BooleanExpression
+val z1 = BV "result" : BooleanExpression
+val z3 = BIns (IV "sum",Eq,IV "temp") : BooleanExpression
+val z4 = BEBop (BC true,And,BV "result") : BooleanExpression
+val testGoodBC = true : bool
+val testGoodBV = true : bool
+val testGoodBIns = true : bool
+val testGoodBEBop = true : bool
+val z1 = BV "y" : BooleanExpression
+val testBadBV = false : bool
+val z1 = BV "i" : BooleanExpression
+val testBadBV = false : bool
+val VInstruction = fn : Instruction -> TypeMapImp -> bool
+val z = InsAssignment ("num",EIntE (IC 145)) : Instruction
+val testGoodAssinInt = true : bool
+val z = InsAssignment ("result",EBoE (BC true)) : Instruction
+val testGoodAssinBool = true : bool
+val testGoodCompound = true : bool
+val blankcompound = InsCompound [] : Instruction
+val testGoodCompound_Empty = true : bool
+val testGoodif = true : bool
+val testGoodloop = true : bool
+val testGoodSkip = true : bool
+val ifcase =
+  InsConditional
+    (BIns (IV #,Eq,IV #),InsAssignment ("num",EBoE #),
+     InsAssignment ("result",EBoE #)) : Instruction
+val testbadif = false : bool
+val Badbody =
+  InsCompound
+    [InsCompound [InsAssignment #,InsAssignment #,InsAssignment #],
+     InsLoop (BIns #,InsCompound #),
+     InsConditional (BIns #,InsAssignment #,InsAssignment #)] : Instruction
+val testbadCompound = false : bool
+val z = InsAssignment ("num",EBoE (BC true)) : Instruction
+val testbadAssinBool = false : bool
+exception InvalidDecList
+val VProgram = fn : Program -> bool
+val testGoodPgm = true : bool
+datatype value = Bool_Value of bool | Integer_Value of int | NoInitialization
+type Program_State = Variable -> value
+val InitialProgram_State = fn : Variable -> value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val x = "x" : string
+val test1 = NoInitialization : value
+val Program_Stateupdate = fn
+  : Program_State -> Variable -> value -> Variable -> value
+val m1 = fn : Variable -> value
+val test1 = Integer_Value 10 : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val m2 = fn : Variable -> value
+val test1 = Integer_Value 10 : value
+val test1 = Integer_Value 100 : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+val m3 = fn : Variable -> value
+val test1 = Integer_Value 10 : value
+val test1 = Integer_Value 100 : value
+val test1 = Integer_Value 150 : value
+val test1 = NoInitialization : value
+val test1 = NoInitialization : value
+exception DivisionError
+exception ArithExpError
+val MeaningArithExp = fn : value * Arithmetic_op * value -> value
+val test1 = Integer_Value 15 : value
+val test1 = Integer_Value 5 : value
+val test1 = Integer_Value 50 : value
+val test1 = Integer_Value 2 : value
+exception RelaExpError
+val MeaningRelaExp = fn : value * Relational_op * value -> value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value true : value
+exception BoolExpError
+val MeaningBoolExp = fn : value * Boolean_op * value -> value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value false : value
+val test1 = Bool_Value false : value
+val MeaningIntExpression = fn : IntegerExpression -> Program_State -> value
+val test1 = Integer_Value 250 : value
+val test1 = Integer_Value 150 : value
+val test1 = Integer_Value 400 : value
+val MeaningBoolExpression = fn : BooleanExpression -> Program_State -> value
+val test1 = Bool_Value true : value
+val test1 = NoInitialization : value
+val test1 = Bool_Value true : value
+val test1 = Bool_Value true : value
+val Meaning_Expression = fn : Expression -> Program_State -> value
+val MeaningInstruction = fn : Instruction -> Program_State -> Program_State
+val test1 = fn : Program_State
+val testAssign = fn : Program_State
+val t1 = Integer_Value 145 : value
+val testCompound = fn : Program_State
+val t1 = Integer_Value 145 : value
+val z = InsAssignment ("result",EBoE (BC true)) : Instruction
+val z1 = InsAssignment ("result",EBoE (BC false)) : Instruction
+val testif = fn : Program_State
+val t1 = Bool_Value true : value
+val testloop = fn : Program_State
+val t1 = Integer_Value 150 : value
+exception ProgramError
+val MeaningProgram = fn : Program -> Program_State
+val myFinalMemory = fn : Program_State
+val test = Integer_Value 145 : value
+val test = Integer_Value 0 : value
+val test = Integer_Value 1 : value
+val test = Integer_Value 1 : value
+val test = Integer_Value 145 : value
+val test = Bool_Value true : value
+-

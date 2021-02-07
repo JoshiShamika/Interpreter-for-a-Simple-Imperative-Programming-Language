@@ -1,0 +1,557 @@
+
+(***************        Step3          ***********************)
+
+
+type Variable = string;
+type Integer_constant = int;
+type Boolean_constant = bool;
+datatype Arithmetic_op = Plus|Minus|Times|Div;
+datatype Relational_op= Lt|Le|Eq|Ne|Ge|Gt;
+datatype Boolean_op= And|Or;
+datatype IntegerExpression = IC of Integer_constant
+							| IV of Variable 
+							|IArOp of (IntegerExpression * Arithmetic_op * IntegerExpression);
+datatype BooleanExpression = BC of Boolean_constant
+							| BV of Variable
+							| BIns of (IntegerExpression * Relational_op * IntegerExpression)
+							| BEBop of (BooleanExpression * Boolean_op * BooleanExpression);
+datatype Expression = EIntE of IntegerExpression
+                    | EBoE of BooleanExpression;
+
+datatype Instruction = Skip
+                     | InsAssignment of (Variable * Expression)
+                     | InsCompound of Instruction list
+                     | InsConditional of (BooleanExpression * Instruction * Instruction)
+                     | InsLoop of (BooleanExpression * Instruction);
+datatype Type = Boolean_Type | Integer_Type;
+type Declaration = Variable * Type;
+type DeclarationList = Declaration list;
+type Program = DeclarationList * Instruction;
+
+
+
+
+
+(*
+SAMPLE CODE #2
+
+PROGRAM strong_number
+{
+	num Integer;
+	i Integer;
+	fact Integer;
+	r Integer;
+	sum Integer;
+	temp Integer;
+	result Boolean;
+	sum = 0;
+	num = 145;
+	temp = num;
+	WHILE (num){
+		i = 1;
+		fact = 1;
+		r = (num Minus 10 Times (num Div 10));
+		WHILE (i Le r){
+			fact = fact Times i;
+			i = i Plus 1;
+			}
+		sum = sum Plus fact;
+		num = num Div 10;
+		}
+	IF(sum Eq temp) THEN result = True;
+	ELSE result = False;
+}
+*)
+
+
+
+
+
+(*num Integer;
+	i Integer;
+	fact Integer;
+	r Integer;
+	sum Integer;
+	temp Integer;
+	result Boolean;*)
+
+val num= "num";
+val i= "i";
+val fact= "fact";
+val r= "r";
+val sum=  "sum";
+val temp= "temp";
+val result= "result";
+val Var_declaration= [ (num, Integer_Type),
+                   (i, Integer_Type),
+                   (fact, Integer_Type),
+                   (r, Integer_Type),
+                   (sum, Integer_Type),
+                   (temp,Integer_Type),
+                   (result, Boolean_Type)];
+(*sum = 0;
+num = 145;
+temp = num;*)
+
+val initialize=InsCompound([InsAssignment(sum,EIntE(IC(0))),
+							InsAssignment(num,EIntE(IC(145))),
+							InsAssignment(temp,EIntE(IV(num)))]);
+
+(*While loop 2 body
+fact = fact Times i;
+i = i Plus 1;
+*)
+
+val while_body2=InsCompound([InsAssignment(fact,
+							EIntE(IArOp(IV(fact),Times,IV(i)))),
+							InsAssignment(i,EIntE(IArOp(IV(i),Plus,IC(1))))]);
+val while_Loop2=InsLoop(BIns(IV(i),Le,IV(r)),while_body2);
+
+(* While loop 1 body:
+		i = 1;
+		fact = 1;
+		r = (num Minus 10 Times (num Div 10));
+		WHILE (i Le r){
+			fact = fact Times i;
+			i = i Plus 1;
+			}
+		sum = sum Plus fact;
+		num = num Div 10;
+		}*)
+
+val while_body1=InsCompound([InsAssignment(i,EIntE(IC(1))),
+							InsAssignment(fact,EIntE(IC(1))),
+							InsAssignment(r,EIntE(IArOp(IV(num), Minus,IArOp(IC(10),Times,IArOp(IV(num), Div,IC(10)))))),
+							while_Loop2,
+							InsAssignment(sum,EIntE(IArOp(IV(sum),Plus,IV(fact)))),
+							InsAssignment(num,EIntE(IArOp(IV(num),Div,IC(10))))]);
+
+val while_Loop1=InsLoop(BIns(IV(num),Gt,IC(0)),while_body1);
+
+val if_condition=InsConditional(BIns(IV(sum),Eq,IV(temp)),InsAssignment(result,EBoE(BC(true))),InsAssignment(result,EBoE(BC(false))));
+
+val body=InsCompound([initialize,while_Loop1,if_condition]);
+val Pgm=(Var_declaration,body);
+
+
+(***************************   Step2   *********************************)
+
+(*1.Internal IType*)
+datatype IType=Intrep|BoolRep|NoDecRep;
+
+(*2.TMI*)
+type TypeMapImp=(Variable*IType)list;
+
+(*3.ITypeSearch:TMI->Var->Itype*)
+(*type VarITypeSearch=TypeMapImp->Variable->IType;*)
+val rec VarITypeSearch=
+(fn([]:TypeMapImp)=>(fn(u:Variable)=>NoDecRep)|
+((v,w)::map_tail:TypeMapImp)=>
+	(fn(u:Variable)=>
+		if u=v then w
+		else VarITypeSearch
+			(map_tail)(u)));
+
+(*4.TypeMapPlusOne:TMI->dec->TMI*)
+(*type TypeMapPlusOne=TypeMapImp->Declaration->TypeMapImp;*)
+val TypeMapPlusOne=(
+fn(THold:TypeMapImp)=>
+(fn((v,Integer_Type):Declaration)=>[(v,Intrep)]@THold|
+   ((v,Boolean_Type):Declaration)=>[(v,BoolRep)]@THold));
+
+
+(*5.DecListToTMI:Declist->TMI*)
+(*type DecListToTMI=DeclarationList->TypeMapImp;*)
+fun DecListToTMI([])=[]|
+DecListToTMI((declist_Head::declist_Tail):DeclarationList)=
+	TypeMapPlusOne
+		(DecListToTMI(declist_Tail))
+		(declist_Head);
+
+(*Testing  Case 1 for step 5 on sample declist*)
+val TMItable=DecListToTMI(Var_declaration);(* TMItable used all trough the code as good symbol table*)
+
+(*Testing  Case for step 3 on sample declist's TMI*)
+val test=VarITypeSearch(TMItable)(r);
+
+(*Testing case 2 step 5 reorganize declist *)
+val Var_declaration= [ (fact, Integer_Type),
+                   (r, Integer_Type),
+                   (num, Integer_Type),
+                   (i, Integer_Type),
+                   (result, Boolean_Type),
+                   (sum, Integer_Type),
+                   (temp,Integer_Type)
+                   ];
+
+val testDeclisttoTMI=DecListToTMI(Var_declaration);
+
+val x="x";
+(*Testing  Case for step 3 on sample declist's TMI*)
+val test=VarITypeSearch(testDeclisttoTMI)(x);
+
+(*6.VarNotInDecList:DecList->Var->Bool*)
+(*type VarNotInDecList=DeclarationList->Variable->bool;*)
+val rec VarNotInDecList=
+fn([]:DeclarationList)=>(fn(v:Variable)=>true)|
+	((x:Variable,y:Type)::DecList_Tail)=>
+		(fn(v:Variable)=>
+			VarNotInDecList(DecList_Tail)(v)andalso
+				(v<>x));
+
+
+(*7. ValidDecList:DecList-> bool*)
+(*type ValidDecList=DeclarationList-> bool;*)
+
+val rec ValidDecList= 
+(fn([])=>true|
+	((x:Variable,y:Type)::DecList_Tail)=>
+		VarNotInDecList(DecList_Tail)(x)andalso
+			ValidDecList(DecList_Tail));
+			
+(*Testing good Case for step 7 *)
+val test7=ValidDecList(Var_declaration);
+(*Testing bad Case for step 7 *)
+val Bad_declaration= [ (num, Integer_Type),
+                   (i, Integer_Type),
+                   (fact, Integer_Type),
+                    (i, Integer_Type)
+                  ];
+val testBad7=ValidDecList(Bad_declaration);
+
+
+(*8. VIntExp:IntExp->TMI->bool*)
+val rec VIntExp=(fn(IC(I))=>(fn(tmi:TypeMapImp)=>true)|
+				   (IV(V))=>(fn(tmi:TypeMapImp)=>
+						(VarITypeSearch(tmi)(V)=Intrep))|
+				   (IArOp(ie1,oop,ie2))=>(fn(tmi:TypeMapImp)=>
+						VIntExp(ie1)(tmi)andalso
+						VIntExp(ie2)(tmi)));
+
+
+
+
+(* Int expressions*)
+val z=IC(1);
+val z2=IV(num);
+val z3=IArOp(IV(sum),Plus,IV(fact));
+
+(*Testing good Case for step 8 *)
+val testGoodIC=VIntExp(z)(TMItable);
+val testGoodIV=VIntExp(z2)(TMItable);
+val testGoodIArOp=VIntExp(z3)TMItable;
+
+(*Testing bad Case for step 8 *)
+val y="y";
+val z2=IV(y);
+(*y has not been declared yet*)
+val testBadIV=VIntExp(z2)TMItable;
+
+(*case 2 passing bool variable*)
+val z2=IArOp(IV(result),Plus,IV(fact));
+(*y used here is of type bool*)
+val testBadIArOp=VIntExp(z2)TMItable;
+
+
+(*9.VBoolExp:BoolExp->TMI->bool*)
+val rec VBoolExp=(fn(BC(B))=>(fn(tmi:TypeMapImp)=>true)|
+					(BV(V))=>(fn(tmi:TypeMapImp)=>
+						(VarITypeSearch(tmi)(V)=BoolRep))|
+					(BIns(ie1,oop,ie2))=>(fn(tmi:TypeMapImp)=>
+						VIntExp(ie1)(tmi)andalso
+						VIntExp(ie2)(tmi))|
+					(BEBop(ie1,oop,ie2))=>(fn(tmi:TypeMapImp)=>
+						VBoolExp(ie1)(tmi)andalso
+						VBoolExp(ie2)(tmi)));
+
+
+(*Bool Exp*)
+val z=BC(true);
+val z1=BV(result);
+val z3=BIns(IV(sum),Eq,IV(temp));
+val z4=BEBop(BC(true),And,BV(result));
+
+(*Testing good Case for step 9 *)
+val testGoodBC=VBoolExp(z)(TMItable);
+val testGoodBV=VBoolExp(z1)(TMItable);
+val testGoodBIns=VBoolExp(z3)(TMItable);
+val testGoodBEBop=VBoolExp(z4)(TMItable);
+
+(*Testing bad Case 1 for step 9*)
+val z1=BV(y);
+val testBadBV=VBoolExp(z1)(TMItable);
+(*Case 2: int variable passed in bool expression*)
+val z1=BV(i);
+val testBadBV=VBoolExp(z1)(TMItable);
+
+
+(*10.VInstruction:Instruction->TMI->bool*)
+fun VInstruction(Skip)=(fn(tmi:TypeMapImp)=>true)|
+	VInstruction(InsAssignment(V,EIntE(e)))=
+		(fn(tmi:TypeMapImp)=>
+			VIntExp(e)(tmi)andalso (VarITypeSearch(tmi)(V)=Intrep))|
+	VInstruction(InsAssignment(V,EBoE(e)))=
+		(fn(tmi:TypeMapImp)=>
+			VBoolExp(e)(tmi)andalso (VarITypeSearch(tmi)(V)=BoolRep))|
+	VInstruction(InsCompound([]))=(fn(tmi:TypeMapImp)=>true)|
+	VInstruction(InsCompound(Inst_Head::Inst_Tail))=
+		(fn(tmi:TypeMapImp)=>
+			VInstruction(Inst_Head)(tmi)andalso
+			VInstruction(InsCompound(Inst_Tail))(tmi))|
+	VInstruction(InsConditional(Cond,T_Branch,F_Branch))=
+		(fn(tmi:TypeMapImp)=>
+			VBoolExp(Cond)(tmi)andalso
+			VInstruction(T_Branch)(tmi)andalso
+			VInstruction(F_Branch)(tmi))|
+	VInstruction(InsLoop(Cond,Inst))=
+		(fn(tmi:TypeMapImp)=>
+			VBoolExp(Cond)(tmi)andalso
+			VInstruction(Inst)(tmi));
+
+
+(*Testing good Case for step 10 *)
+(*Case1: assign with int*)
+val z=InsAssignment(num,EIntE(IC(145)));
+val testGoodAssinInt=VInstruction(z)(TMItable);
+(*Case2: assign with bool*)
+val z=InsAssignment(result,EBoE(BC(true)));
+val testGoodAssinBool=VInstruction(z)(TMItable);
+(*Case 3: compound from sample code, that is while loop#1's instructions from body*)
+val testGoodCompound=VInstruction(while_body1)(TMItable);
+(*Case 4: Empty declaration of compound statements*)
+val blankcompound=InsCompound([]);
+val testGoodCompound_Empty=VInstruction(blankcompound)(TMItable);
+(*Case 5:if condition from sample code *)
+val testGoodif=VInstruction(if_condition)(TMItable);
+(*Case 6: loop from the sample code*)
+val testGoodloop=VInstruction(while_Loop1)(TMItable);
+(*Case 7 Skip*)
+val testGoodSkip=VInstruction(Skip)(TMItable);
+
+
+(*Testing bad Case for step 10 *)
+(*Case 1:bad if*)
+val ifcase=InsConditional(BIns(IV(sum),Eq,IV(temp)),InsAssignment(num,EBoE(BC(true))),InsAssignment(result,EBoE(BC(false))));
+val testbadif=VInstruction(ifcase)(TMItable);
+(*Case2:bad compound coz of wrong if*)
+val Badbody=InsCompound([initialize,while_Loop1,ifcase]);
+val testbadCompound=VInstruction(Badbody)(TMItable);
+(*Case3:bad assign with bool*)
+val z=InsAssignment(num,EBoE(BC(true)));
+val testbadAssinBool=VInstruction(z)(TMItable);
+
+
+(*11.Exception *)
+exception InvalidDecList;
+
+(*12.VProgram:Program->Bool*)
+
+val VProgram=
+	(fn((DecList,Prog):Program)=>
+		if ValidDecList(DecList)
+			then VInstruction(Prog)(DecListToTMI(DecList))
+			else raise InvalidDecList);
+
+
+
+(*Testing good Case for step 12 *)
+val testGoodPgm=VProgram(Pgm);
+
+(*Testing bad Case for step 12 *)
+(*val BadPgm=(Bad_declaration,body);
+val testBadPgm=VProgram(BadPgm);*)
+
+
+
+
+(***************************   Step3   *********************************)
+
+(*1*)
+datatype value= Integer_Value of int|Bool_Value of bool|NoInitialization;
+
+(*2*)
+type Program_State=Variable-> value;
+
+(*3.InitialProgram_State:Program_State*)
+
+val InitialProgram_State=(fn(V:Variable)=>NoInitialization);
+
+(*Test Cases for *3.InitialProgram_State*)
+val test1 = InitialProgram_State(num);
+val test1 = InitialProgram_State(temp);
+val test1 = InitialProgram_State(i);
+val test1 = InitialProgram_State(fact);
+val test1 = InitialProgram_State(r);
+val test1 = InitialProgram_State(sum);
+val test1 = InitialProgram_State(result);
+val x="x";
+val test1 = InitialProgram_State(x);
+
+(*4.Program_Stateupdate*)
+val Program_Stateupdate=
+	(fn(State:Program_State)=>
+		(fn(u:Variable)=>
+			(fn(v:value)=>
+				(fn(w:Variable)=>if w=u then v else State(w)
+))));
+
+
+(*Testing for 4.Program_Stateupdate*)
+(*Step a*)
+val m1=Program_Stateupdate(InitialProgram_State)(x)(Integer_Value(10));
+val test1=m1(x);
+val test1=m1(r);
+val test1=m1(num);
+val test1=m1(sum);
+val test1=m1(temp);
+(*Step b*)
+val m2=Program_Stateupdate(m1)(r)(Integer_Value(100));
+val test1=m2(x);
+val test1=m2(r);
+val test1=m2(num);
+val test1=m2(sum);
+val test1=m2(temp);
+(*Step c*)
+val m3=Program_Stateupdate(m2)(num)(Integer_Value(150));
+val test1=m3(x);
+val test1=m3(r);
+val test1=m3(num);
+val test1=m3(sum);
+val test1=m3(temp);
+
+(*5.*)
+exception DivisionError;
+
+(*6.*)
+exception ArithExpError;
+
+(*7.MeaningArithExp*)
+fun MeaningArithExp(Integer_Value(v1),Plus,Integer_Value(v2))=Integer_Value(v1+v2)|
+	MeaningArithExp(Integer_Value(v1),Minus,Integer_Value(v2))=Integer_Value(v1-v2)|
+	MeaningArithExp(Integer_Value(v1),Times,Integer_Value(v2))=Integer_Value(v1*v2)|
+	MeaningArithExp(Integer_Value(v1),Div,Integer_Value(v2))=if v2=0 then raise DivisionError else Integer_Value(v1 div v2)|
+	MeaningArithExp(_,_,_)=raise ArithExpError;
+
+(*Testing for 7.MeaningArithExp*)
+val test1=MeaningArithExp(Integer_Value(10),Plus,Integer_Value(5));
+val test1=MeaningArithExp(Integer_Value(10),Minus,Integer_Value(5));
+val test1=MeaningArithExp(Integer_Value(10),Times,Integer_Value(5));
+val test1=MeaningArithExp(Integer_Value(10),Div,Integer_Value(5));
+(*Testing bad cases of divide of zero and wrong arithmatic expression*)
+(*val test1=MeaningArithExp(Integer_Value(10),Div,Integer_Value(0));*)
+(*val test1=MeaningArithExp(Bool_Value(true),Times,Integer_Value(5));*)
+
+(*8.*)
+exception RelaExpError;
+
+(*9.MeaningRelaExp*)
+fun MeaningRelaExp(Integer_Value(v1),Lt,Integer_Value(v2))=Bool_Value(v1 < v2)|
+	MeaningRelaExp(Integer_Value(v1),Le,Integer_Value(v2))=Bool_Value(v1 <= v2)|
+	MeaningRelaExp(Integer_Value(v1),Eq,Integer_Value(v2))=Bool_Value(v1 = v2)|
+	MeaningRelaExp(Integer_Value(v1),Ne,Integer_Value(v2))=Bool_Value(v1 <> v2)|
+	MeaningRelaExp(Integer_Value(v1),Ge,Integer_Value(v2))=Bool_Value(v1 >= v2)|
+	MeaningRelaExp(Integer_Value(v1),Gt,Integer_Value(v2))=Bool_Value(v1 > v2)|
+	MeaningRelaExp(_,_,_)=raise RelaExpError;
+
+
+(*Testing for 9.MeaningRelaExp*)
+val test1=MeaningRelaExp(Integer_Value(10),Gt,Integer_Value(5));
+val test1=MeaningRelaExp(Integer_Value(10),Ge,Integer_Value(10));
+val test1=MeaningRelaExp(Integer_Value(3),Lt,Integer_Value(5));
+val test1=MeaningRelaExp(Integer_Value(5),Le,Integer_Value(5));
+val test1=MeaningRelaExp(Integer_Value(3),Ne,Integer_Value(5));
+val test1=MeaningRelaExp(Integer_Value(5),Eq,Integer_Value(5));
+
+
+(*10.*)
+exception BoolExpError;
+
+(*11.MeaningBoolExp*)
+fun MeaningBoolExp(Bool_Value(v1),And,Bool_Value(v2))=Bool_Value(v1 andalso v2)|
+	MeaningBoolExp(Bool_Value(v1),Or,Bool_Value(v2))=Bool_Value(v1 orelse v2)|
+	MeaningBoolExp(_,_,_)=raise BoolExpError;
+
+(*Testing for 11.MeaningBoolExp*)
+val test1=MeaningBoolExp(Bool_Value(true),And,Bool_Value(true));
+val test1=MeaningBoolExp(Bool_Value(true),Or,Bool_Value(false));
+val test1=MeaningBoolExp(Bool_Value(true),And,Bool_Value(false));
+val test1=MeaningBoolExp(Bool_Value(false),Or,Bool_Value(false));
+
+
+(*12.MeaningIntExpression*)
+fun MeaningIntExpression(IC(i))(State:Program_State)=Integer_Value(i)|
+	MeaningIntExpression(IV(v))(State:Program_State)=State(v)|
+	MeaningIntExpression(IArOp(ie1,oop,ie2))(State:Program_State)=MeaningArithExp(MeaningIntExpression(ie1)(State),oop,MeaningIntExpression(ie2)(State));
+
+(*Testing for 12.MeaningIntExpression*)
+val test1=MeaningIntExpression(IC(250))(m3);
+val test1=MeaningIntExpression(IV(num))(m3);
+val test1=MeaningIntExpression(IArOp(IV(num),Plus,IC(250)))(m3);
+
+
+(*13.MeaningBoolExp*)
+fun MeaningBoolExpression(BC(i))(State:Program_State)=Bool_Value(i)|
+	MeaningBoolExpression(BV(v))(State:Program_State)=State(v)|
+	MeaningBoolExpression(BIns(ie1,oop,ie2))(State:Program_State)=
+	MeaningRelaExp(MeaningIntExpression(ie1)(State),oop,MeaningIntExpression(ie2)(State))|
+	MeaningBoolExpression(BEBop(ie1,oop,ie2))(State:Program_State)=
+	MeaningBoolExp(MeaningBoolExpression(ie1)(State),oop,MeaningBoolExpression(ie2)(State));
+
+(*Testing for 12.MeaningIntExpression*)
+val test1=MeaningBoolExpression(BC(true))(m3);
+val test1=MeaningBoolExpression(BV(result))(m3);
+val test1=MeaningBoolExpression(BIns(IV(num),Le,IC(250)))(m3);
+val test1=MeaningBoolExpression(BEBop(BC(true),And,BC(true)))(m3);
+
+(*14. Meaning_Expression*)
+val Meaning_Expression=(fn(EIntE(Exp))=>(fn(State:Program_State)=>MeaningIntExpression(Exp)(State))|
+				  (EBoE(Exp))=>(fn(State:Program_State)=>MeaningBoolExpression(Exp)(State)));
+
+(*15. MeaningInstruction*)
+
+val rec MeaningInstruction=((fn(Skip)=>(fn(State:Program_State)=>State)|
+							   (InsAssignment(v,e1))=>(fn(State:Program_State)=>Program_Stateupdate(State)(v)(Meaning_Expression(e1)(State)))|
+							   (InsCompound([]))=>(fn(State:Program_State)=>State)|
+							   (InsCompound(Inst_Head::Inst_Tail))=>(fn(State:Program_State)=>
+									MeaningInstruction(InsCompound(Inst_Tail))(MeaningInstruction(Inst_Head)(State)))|
+							   (InsConditional(Cond,T_Branch,F_Branch))=>(fn(State:Program_State)=>if MeaningBoolExpression(Cond)(State)=Bool_Value(true)
+									then MeaningInstruction(T_Branch)(State)
+									else MeaningInstruction(F_Branch)(State))|
+							   (InsLoop(Cond,Inst))=>(fn(State:Program_State)=>if MeaningBoolExpression(Cond)(State)=Bool_Value(true)
+									then MeaningInstruction(InsLoop(Cond,Inst))(MeaningInstruction(Inst)(State))
+									else State)
+));
+
+(*Testing for 15.MeaningInstruction*)
+val test1=MeaningInstruction(Skip)(m3);
+val testAssign=MeaningInstruction(InsAssignment(num,EIntE(IC(145))))(m3);
+val t1=testAssign(num);
+val testCompound=MeaningInstruction(initialize)(m3);
+val t1=testCompound(num);
+
+val z=InsAssignment(result,EBoE(BC(true)));
+val z1=InsAssignment(result,EBoE(BC(false)));
+val testif=MeaningInstruction(InsConditional(BIns(IV(num),Le,IC(250)),z,z1))(m3);
+val t1=testif(result);
+val testloop=MeaningInstruction(InsLoop(BIns(IV(num),Gt,IC(250)),initialize))(m3);
+val t1=testloop(num);
+(*16.*)
+exception ProgramError;
+
+(*17. MeaningProgram*)
+fun MeaningProgram((DecList,Prog):Program)= if VProgram(DecList,Prog)
+	then MeaningInstruction(body)(InitialProgram_State)
+	else raise ProgramError;
+
+(*Testing good case for MeaningProgram*)
+val myFinalMemory=MeaningProgram(Pgm);
+val test=myFinalMemory(sum);
+val test=myFinalMemory(num);
+val test=myFinalMemory(fact);
+val test=myFinalMemory(r);
+val test=myFinalMemory(temp);
+val test=myFinalMemory(result);
+
+
+
+
